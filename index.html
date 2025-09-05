@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency History Timeline Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slide {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+            flex: 1;
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .slide-header h1 {
+            font-size: 2.5rem;
+            color: #4a5568;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .slide-header p {
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+            padding: 20px;
+        }
+
+        .nav-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #4fd1c7 0%, #14b8a6 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(20, 184, 166, 0.4);
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(20, 184, 166, 0.6);
+        }
+
+        .nav-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .instructions h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .instructions ol {
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin: 15px 0;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .game-area {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .cards-container {
+            flex: 1;
+            min-width: 350px;
+        }
+
+        .timeline-container {
+            flex: 1;
+            min-width: 350px;
+        }
+
+        .section-title {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #4a5568;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .currency-card {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            cursor: grab;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border: 3px solid transparent;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .currency-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .currency-card.dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+            cursor: grabbing;
+            z-index: 1000;
+        }
+
+        .currency-card.correct {
+            background: linear-gradient(135deg, #d4f4dd 0%, #a7f3d0 100%);
+            border-color: #10b981;
+            animation: correctPulse 0.6s ease;
+        }
+
+        .currency-card.incorrect {
+            background: linear-gradient(135deg, #fed7d7 0%, #fc8181 100%);
+            border-color: #f56565;
+            animation: incorrectShake 0.6s ease;
+        }
+
+        @keyframes correctPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes incorrectShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #2d3748;
+            font-size: 0.9rem;
+        }
+
+        .card-period {
+            font-size: 0.8rem;
+            color: #4a5568;
+        }
+
+        .timeline {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 25px;
+            min-height: 500px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .timeline-slot {
+            background: #f7fafc;
+            border: 3px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .timeline-slot.drag-over {
+            background: #e6fffa;
+            border-color: #4fd1c7;
+            transform: scale(1.02);
+        }
+
+        .timeline-slot.filled {
+            border-style: solid;
+            border-color: #4fd1c7;
+            background: #f0fdfa;
+        }
+
+        .timeline-slot.correct {
+            border-color: #10b981;
+            background: #d1fae5;
+        }
+
+        .timeline-slot.incorrect {
+            border-color: #f56565;
+            background: #fed7d7;
+        }
+
+        .slot-number {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: #4fd1c7;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .game-controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .start-btn, .check-btn, .reset-btn {
+            padding: 15px 40px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+
+        .check-btn {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+        }
+
+        .start-btn:hover, .check-btn:hover, .reset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .start-btn:disabled, .check-btn:disabled, .reset-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .results {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .score {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 15px;
+        }
+
+        .answers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .answer-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            text-align: left;
+        }
+
+        .answer-card h3 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .answer-card .period {
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .answer-card .description {
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4fd1c7 0%, #14b8a6 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .slide-header h1 {
+                font-size: 2rem;
+            }
+
+            .slide-header p {
+                font-size: 1rem;
+            }
+
+            .game-area {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .cards-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 10px;
+            }
+
+            .currency-card {
+                padding: 15px;
+            }
+
+            .card-icon {
+                font-size: 1.5rem;
+            }
+
+            .card-title {
+                font-size: 0.8rem;
+            }
+
+            .card-period {
+                font-size: 0.7rem;
+            }
+
+            .navigation {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .nav-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+
+            .answers-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 슬라이드 1: 타이틀 -->
+        <div id="slide-0" class="slide active">
+            <div class="slide-header">
+                <h1>💰 Currency History Timeline Game</h1>
+                <p>화폐의 역사를 시간 순서대로 배치해보세요!</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 50px;">
+                <div style="background: rgba(255, 255, 255, 0.9); padding: 40px; border-radius: 20px; max-width: 600px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
+                    <h2 style="color: #4a5568; margin-bottom: 20px;">🎮 게임 소개</h2>
+                    <p style="font-size: 1.1rem; line-height: 1.6; color: #555; margin-bottom: 30px;">
+                        인류 역사상 가장 중요한 8가지 화폐 시스템을 올바른 시간 순서대로 배치하는 교육용 게임입니다. 
+                        물물교환부터 비트코인까지, 화폐의 진화 과정을 학습해보세요!
+                    </p>
+                    <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                        <div style="background: #f0f9ff; padding: 15px; border-radius: 10px; border-left: 4px solid #0ea5e9;">
+                            <strong>🎯 목표:</strong> 8개 카드 모두 정확히 배치
+                        </div>
+                        <div style="background: #f0fdf4; padding: 15px; border-radius: 10px; border-left: 4px solid #22c55e;">
+                            <strong>⏰ 범위:</strong> 기원전 9000년 ~ 2009년
+                        </div>
+                        <div style="background: #fef3f2; padding: 15px; border-radius: 10px; border-left: 4px solid #ef4444;">
+                            <strong>📱 지원:</strong> 드래그 앤 드롭 + 터치
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 슬라이드 2: 게임 방법 -->
+        <div id="slide-1" class="slide">
+            <div class="slide-header">
+                <h1>📋 How to Play</h1>
+                <p>게임 방법을 확인하세요</p>
+            </div>
+
+            <div class="instructions">
+                <h2>🎯 게임 목표</h2>
+                <p style="margin-bottom: 20px; font-size: 1.1rem; color: #555;">8개의 화폐 역사 카드를 올바른 시간 순서대로 타임라인에 배치하세요.</p>
+
+                <h2>🎮 플레이 방법</h2>
+                <ol>
+                    <li><strong>게임 시작:</strong> "게임 시작" 버튼을 클릭하여 카드를 활성화합니다.</li>
+                    <li><strong>카드 드래그:</strong> 왼쪽의 화폐 카드를 마우스나 터치로 드래그합니다.</li>
+                    <li><strong>타임라인 배치:</strong> 오른쪽 타임라인의 적절한 위치에 카드를 드롭합니다.</li>
+                    <li><strong>순서 확인:</strong> 모든 카드를 배치한 후 "정답 확인" 버튼을 클릭합니다.</li>
+                    <li><strong>결과 보기:</strong> 점수와 함께 정답 및 해설을 확인합니다.</li>
+                </ol>
+
+                <h2>💡 게임 팁</h2>
+                <ul style="list-style-type: none; padding-left: 0;">
+                    <li style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        💭 <strong>역사적 맥락 고려:</strong> 각 화폐 시스템이 등장한 문명과 시대를 생각해보세요.
+                    </li>
+                    <li style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        🔄 <strong>순서 조정 가능:</strong> 드래그 앤 드롭으로 언제든 카드 위치를 바꿀 수 있습니다.
+                    </li>
+                    <li style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        📱 <strong>모바일 지원:</strong> 터치 디바이스에서도 원활하게 플레이할 수 있습니다.
+                    </li>
+                    <li style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        🏆 <strong>완벽한 점수:</strong> 8개 모두 맞히면 100점을 획득합니다!
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 슬라이드 3: 메인 게임 -->
+        <div id="slide-2" class="slide">
+            <div class="slide-header">
+                <h1>🎯 Arrange the Historical Money Cards!</h1>
+                <p>카드를 드래그하여 시간순으로 배치하세요</p>
+            </div>
+
+            <div class="game-controls">
+                <button class="start-btn" id="startGameBtn">🚀 게임 시작</button>
+                <button class="check-btn" id="checkAnswerBtn" disabled>✅ 정답 확인</button>
+                <button class="reset-btn" id="resetGameBtn" disabled>🔄 다시 시작</button>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <div class="game-area">
+                <div class="cards-container">
+                    <div class="section-title">💳 화폐 역사 카드</div>
+                    <div class="cards-grid" id="cardsGrid">
+                        <!-- 카드들이 JavaScript로 생성됩니다 -->
+                    </div>
+                </div>
+
+                <div class="timeline-container">
+                    <div class="section-title">⏰ 시간 순서대로 배치</div>
+                    <div class="timeline" id="timeline">
+                        <!-- 타임라인 슬롯들이 JavaScript로 생성됩니다 -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="results" id="results" style="display: none;">
+                <div class="score" id="scoreDisplay"></div>
+                <p id="scoreMessage"></p>
+            </div>
+        </div>
+
+        <!-- 슬라이드 4: 정답 및 해설 -->
+        <div id="slide-3" class="slide">
+            <div class="slide-header">
+                <h1>📚 Answers & Explanations</h1>
+                <p>화폐 역사의 올바른 순서와 상세한 설명</p>
+            </div>
+
+            <div class="answers-grid" id="answersGrid">
+                <!-- 정답과 해설이 JavaScript로 생성됩니다 -->
+            </div>
+        </div>
+
+        <!-- 네비게이션 -->
+        <div class="navigation">
+            <button class="nav-btn" onclick="showSlide(0)">🏠 홈</button>
+            <button class="nav-btn" onclick="showSlide(1)">📋 게임방법</button>
+            <button class="nav-btn" onclick="showSlide(2)">🎮 게임하기</button>
+            <button class="nav-btn" onclick="showSlide(3)">📚 정답보기</button>
+        </div>
+    </div>
+
+    <script>
+        // 화폐 역사 데이터 (시간순 정렬)
+        const currencyHistoryData = [
+            {
+                id: "barter",
+                title: "Barter System",
+                period: "9000-6000 BC",
+                year: -7500,
+                icon: "🤝",
+                description: "인류 최초의 교환 시스템으로, 물건과 물건을 직접 교환하는 방식입니다. 농업 혁명 이후 잉여 생산물을 교환하기 위해 발달했습니다."
+            },
+            {
+                id: "cowrie_shells",
+                title: "Cowrie Shells",
+                period: "1200 BC",
+                year: -1200,
+                icon: "🐚",
+                description: "중국과 아프리카에서 사용된 최초의 표준화된 화폐입니다. 조개껍데기의 희소성과 휴대성 때문에 가치저장 수단으로 널리 사용되었습니다."
+            },
+            {
+                id: "chinese_coins",
+                title: "First Minted Coins in China",
+                period: "640 BC",
+                year: -640,
+                icon: "🪙",
+                description: "중국에서 제작된 최초의 주조 화폐입니다. 청동으로 만들어졌으며, 표준화된 무게와 품질로 거래의 신뢰성을 높였습니다."
+            },
+            {
+                id: "lydian_coins",
+                title: "Lydian Coins",
+                period: "600 BC",
+                year: -600,
+                icon: "👑",
+                description: "현재 터키 지역의 리디아 왕국에서 만든 세계 최초의 공식 주화입니다. 금과 은 합금으로 제작되어 국제 거래에 사용되었습니다."
+            },
+            {
+                id: "paper_money",
+                title: "Paper Money in China",
+                period: "960-1020 AD",
+                year: 990,
+                icon: "📜",
+                description: "송나라 시대에 발행된 세계 최초의 공식 지폐 '교자(Jiaozi)'입니다. 무거운 동전을 대체하여 대규모 거래를 용이하게 만들었습니다."
+            },
+            {
+                id: "gold_standard",
+                title: "Gold Standard",
+                period: "1816",
+                year: 1816,
+                icon: "🥇",
+                description: "영국이 최초로 도입한 금본위제입니다. 화폐 가치를 금의 가치에 고정시켜 국제 거래의 안정성을 제공했으며, 19세기 국제 경제의 기반이 되었습니다."
+            },
+            {
+                id: "end_gold_standard",
+                title: "End of Gold Standard",
+                period: "1930s",
+                year: 1935,
+                icon: "📉",
+                description: "대공황 시기에 각국이 금본위제를 포기하기 시작했습니다. 경제 정책의 유연성을 위해 화폐와 금의 연결고리를 끊었습니다."
+            },
+            {
+                id: "bitcoin",
+                title: "Bitcoin Emergence",
+                period: "2009",
+                year: 2009,
+                icon: "₿",
+                description: "사토시 나카모토가 개발한 세계 최초의 암호화폐입니다. 블록체인 기술을 기반으로 하여 중앙은행 없이도 거래가 가능한 디지털 화폐 시대를 열었습니다."
+            }
+        ];
+
+        // 게임 상태 관리
+        let gameState = {
+            isStarted: false,
+            droppedCards: [],
+            currentSlide: 0,
+            score: 0,
+            draggedElement: null,
+            touchOffset: { x: 0, y: 0 }
+        };
+
+        // 슬라이드 네비게이션
+        function showSlide(slideIndex) {
+            document.querySelectorAll('.slide').forEach(slide => {
+                slide.classList.remove('active');
+            });
+            document.getElementById(`slide-${slideIndex}`).classList.add('active');
+            gameState.currentSlide = slideIndex;
+        }
+
+        // 카드 생성
+        function createCards() {
+            const cardsGrid = document.getElementById('cardsGrid');
+            cardsGrid.innerHTML = '';
+
+            // 카드를 랜덤하게 섞어서 표시
+            const shuffledData = [...currencyHistoryData].sort(() => Math.random() - 0.5);
+
+            shuffledData.forEach(item => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'currency-card';
+                cardElement.draggable = false; // 게임 시작 전에는 드래그 불가
+                cardElement.dataset.id = item.id;
+                cardElement.dataset.year = item.year;
+
+                cardElement.innerHTML = `
+                    <div class="card-icon">${item.icon}</div>
+                    <div class="card-title">${item.title}</div>
+                    <div class="card-period">${item.period}</div>
+                `;
+
+                cardsGrid.appendChild(cardElement);
+            });
+        }
+
+        // 타임라인 슬롯 생성
+        function createTimelineSlots() {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = '';
+
+            for (let i = 1; i <= 8; i++) {
+                const slotElement = document.createElement('div');
+                slotElement.className = 'timeline-slot';
+                slotElement.dataset.position = i;
+                slotElement.innerHTML = `
+                    <div class="slot-number">${i}</div>
+                    <div style="color: #9ca3af; font-style: italic;">여기에 ${i}번째 카드를 놓으세요</div>
+                `;
+                timeline.appendChild(slotElement);
+            }
+        }
+
+        // 게임 시작
+        function startGame() {
+            gameState.isStarted = true;
+            gameState.droppedCards = [];
+            gameState.score = 0;
+
+            // 버튼 상태 업데이트
+            document.getElementById('startGameBtn').disabled = true;
+            document.getElementById('checkAnswerBtn').disabled = false;
+            document.getElementById('resetGameBtn').disabled = false;
+
+            // 결과 숨기기
+            document.getElementById('results').style.display = 'none';
+
+            // 카드 드래그 활성화
+            const cards = document.querySelectorAll('.currency-card');
+            cards.forEach(card => {
+                card.draggable = true;
+                card.style.cursor = 'grab';
+
+                // 드래그 이벤트
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+
+                // 터치 이벤트 (모바일)
+                card.addEventListener('touchstart', handleTouchStart, { passive: false });
+                card.addEventListener('touchmove', handleTouchMove, { passive: false });
+                card.addEventListener('touchend', handleTouchEnd, { passive: false });
+            });
+
+            // 타임라인 슬롯 드롭 존 설정
+            const slots = document.querySelectorAll('.timeline-slot');
+            slots.forEach(slot => {
+                slot.addEventListener('dragover', handleDragOver);
+                slot.addEventListener('drop', handleDrop);
+                slot.addEventListener('dragenter', handleDragEnter);
+                slot.addEventListener('dragleave', handleDragLeave);
+            });
+
+            updateProgress();
+        }
+
+        // 드래그 시작
+        function handleDragStart(e) {
+            if (!gameState.isStarted) return;
+
+            gameState.draggedElement = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', e.target.outerHTML);
+        }
+
+        // 드래그 종료
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            gameState.draggedElement = null;
+        }
+
+        // 드래그 오버
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        // 드래그 엔터
+        function handleDragEnter(e) {
+            if (e.target.classList.contains('timeline-slot')) {
+                e.target.classList.add('drag-over');
+            }
+        }
+
+        // 드래그 리브
+        function handleDragLeave(e) {
+            if (e.target.classList.contains('timeline-slot')) {
+                e.target.classList.remove('drag-over');
+            }
+        }
+
+        // 드롭 처리
+        function handleDrop(e) {
+            e.preventDefault();
+            const slot = e.target.closest('.timeline-slot');
+            if (!slot || !gameState.draggedElement) return;
+
+            slot.classList.remove('drag-over');
+
+            // 이미 카드가 있는 슬롯인지 확인
+            const existingCard = slot.querySelector('.currency-card');
+            if (existingCard) {
+                // 기존 카드를 카드 영역으로 되돌리기
+                returnCardToGrid(existingCard);
+            }
+
+            // 새 카드를 슬롯에 배치
+            const cardClone = gameState.draggedElement.cloneNode(true);
+            cardClone.draggable = true;
+
+            // 이벤트 리스너 다시 추가
+            cardClone.addEventListener('dragstart', handleDragStart);
+            cardClone.addEventListener('dragend', handleDragEnd);
+            cardClone.addEventListener('touchstart', handleTouchStart, { passive: false });
+            cardClone.addEventListener('touchmove', handleTouchMove, { passive: false });
+            cardClone.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+            slot.innerHTML = '';
+            slot.appendChild(cardClone);
+            slot.classList.add('filled');
+
+            // 원본 카드 제거
+            gameState.draggedElement.remove();
+
+            updateProgress();
+        }
+
+        // 터치 이벤트 처리 (모바일)
+        function handleTouchStart(e) {
+            if (!gameState.isStarted) return;
+
+            e.preventDefault();
+            gameState.draggedElement = e.target.closest('.currency-card');
+
+            const touch = e.touches[0];
+            const rect = gameState.draggedElement.getBoundingClientRect();
+            gameState.touchOffset = {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
+            };
+
+            gameState.draggedElement.classList.add('dragging');
+            gameState.draggedElement.style.position = 'fixed';
+            gameState.draggedElement.style.zIndex = '1000';
+            gameState.draggedElement.style.pointerEvents = 'none';
+
+            updateTouchPosition(touch);
+        }
+
+        function handleTouchMove(e) {
+            if (!gameState.draggedElement) return;
+
+            e.preventDefault();
+            const touch = e.touches[0];
+            updateTouchPosition(touch);
+
+            // 터치 위치 아래의 요소 찾기
+            const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const slot = elementBelow?.closest('.timeline-slot');
+
+            // 드래그 오버 효과
+            document.querySelectorAll('.timeline-slot').forEach(s => s.classList.remove('drag-over'));
+            if (slot) {
+                slot.classList.add('drag-over');
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!gameState.draggedElement) return;
+
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const slot = elementBelow?.closest('.timeline-slot');
+
+            // 스타일 초기화
+            gameState.draggedElement.style.position = '';
+            gameState.draggedElement.style.zIndex = '';
+            gameState.draggedElement.style.pointerEvents = '';
+            gameState.draggedElement.classList.remove('dragging');
+
+            // 드래그 오버 효과 제거
+            document.querySelectorAll('.timeline-slot').forEach(s => s.classList.remove('drag-over'));
+
+            if (slot) {
+                // 슬롯에 드롭
+                const existingCard = slot.querySelector('.currency-card');
+                if (existingCard) {
+                    returnCardToGrid(existingCard);
+                }
+
+                const cardClone = gameState.draggedElement.cloneNode(true);
+                cardClone.draggable = true;
+
+                // 이벤트 리스너 다시 추가
+                cardClone.addEventListener('dragstart', handleDragStart);
+                cardClone.addEventListener('dragend', handleDragEnd);
+                cardClone.addEventListener('touchstart', handleTouchStart, { passive: false });
+                cardClone.addEventListener('touchmove', handleTouchMove, { passive: false });
+                cardClone.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+                slot.innerHTML = '';
+                slot.appendChild(cardClone);
+                slot.classList.add('filled');
+
+                gameState.draggedElement.remove();
+
+                updateProgress();
+            }
+
+            gameState.draggedElement = null;
+        }
+
+        function updateTouchPosition(touch) {
+            if (gameState.draggedElement) {
+                gameState.draggedElement.style.left = `${touch.clientX - gameState.touchOffset.x}px`;
+                gameState.draggedElement.style.top = `${touch.clientY - gameState.touchOffset.y}px`;
+            }
+        }
+
+        // 카드를 그리드로 되돌리기
+        function returnCardToGrid(card) {
+            const cardsGrid = document.getElementById('cardsGrid');
+            const cardClone = card.cloneNode(true);
+
+            // 이벤트 리스너 다시 추가
+            cardClone.addEventListener('dragstart', handleDragStart);
+            cardClone.addEventListener('dragend', handleDragEnd);
+            cardClone.addEventListener('touchstart', handleTouchStart, { passive: false });
+            cardClone.addEventListener('touchmove', handleTouchMove, { passive: false });
+            cardClone.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+            cardsGrid.appendChild(cardClone);
+        }
+
+        // 진행률 업데이트
+        function updateProgress() {
+            const filledSlots = document.querySelectorAll('.timeline-slot.filled').length;
+            const progress = (filledSlots / 8) * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+
+            // 모든 슬롯이 채워지면 정답 확인 버튼 활성화
+            document.getElementById('checkAnswerBtn').disabled = filledSlots < 8;
+        }
+
+        // 정답 확인
+        function checkAnswer() {
+            const slots = document.querySelectorAll('.timeline-slot');
+            let correctCount = 0;
+            const userOrder = [];
+
+            slots.forEach((slot, index) => {
+                const card = slot.querySelector('.currency-card');
+                if (card) {
+                    const cardYear = parseInt(card.dataset.year);
+                    userOrder.push(cardYear);
+
+                    // 정답 순서와 비교
+                    const correctYear = currencyHistoryData[index].year;
+                    if (cardYear === correctYear) {
+                        slot.classList.add('correct');
+                        card.classList.add('correct');
+                        correctCount++;
+                    } else {
+                        slot.classList.add('incorrect');
+                        card.classList.add('incorrect');
+                    }
+                }
+            });
+
+            // 점수 계산 및 표시
+            gameState.score = Math.round((correctCount / 8) * 100);
+            showResults(correctCount);
+
+            // 버튼 상태 업데이트
+            document.getElementById('checkAnswerBtn').disabled = true;
+        }
+
+        // 결과 표시
+        function showResults(correctCount) {
+            const resultsDiv = document.getElementById('results');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const scoreMessage = document.getElementById('scoreMessage');
+
+            scoreDisplay.textContent = `${gameState.score}점 (${correctCount}/8 정답)`;
+
+            if (correctCount === 8) {
+                scoreMessage.textContent = "🏆 완벽합니다! 화폐 역사의 달인이군요!";
+                scoreMessage.style.color = '#10b981';
+            } else if (correctCount >= 6) {
+                scoreMessage.textContent = "👍 훌륭합니다! 화폐 역사를 잘 알고 계시네요!";
+                scoreMessage.style.color = '#3b82f6';
+            } else if (correctCount >= 4) {
+                scoreMessage.textContent = "📚 괜찮습니다! 조금 더 학습하면 완벽할 거예요!";
+                scoreMessage.style.color = '#f59e0b';
+            } else {
+                scoreMessage.textContent = "💪 다시 도전해보세요! 정답 해설을 확인해보세요!";
+                scoreMessage.style.color = '#ef4444';
+            }
+
+            resultsDiv.style.display = 'block';
+        }
+
+        // 게임 리셋
+        function resetGame() {
+            gameState.isStarted = false;
+            gameState.droppedCards = [];
+            gameState.score = 0;
+
+            // 버튼 상태 초기화
+            document.getElementById('startGameBtn').disabled = false;
+            document.getElementById('checkAnswerBtn').disabled = true;
+            document.getElementById('resetGameBtn').disabled = true;
+
+            // 결과 숨기기
+            document.getElementById('results').style.display = 'none';
+
+            // 진행률 초기화
+            document.getElementById('progressFill').style.width = '0%';
+
+            // 카드와 타임라인 초기화
+            createCards();
+            createTimelineSlots();
+        }
+
+        // 정답 및 해설 생성
+        function createAnswersSection() {
+            const answersGrid = document.getElementById('answersGrid');
+            answersGrid.innerHTML = '';
+
+            currencyHistoryData.forEach((item, index) => {
+                const answerCard = document.createElement('div');
+                answerCard.className = 'answer-card';
+                answerCard.innerHTML = `
+                    <h3>
+                        <span style="background: #4fd1c7; color: white; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: 600;">${index + 1}</span>
+                        ${item.icon} ${item.title}
+                    </h3>
+                    <div class="period">${item.period}</div>
+                    <div class="description">${item.description}</div>
+                `;
+                answersGrid.appendChild(answerCard);
+            });
+        }
+
+        // 이벤트 리스너 설정
+        document.addEventListener('DOMContentLoaded', function() {
+            // 게임 초기화
+            createCards();
+            createTimelineSlots();
+            createAnswersSection();
+
+            // 버튼 이벤트
+            document.getElementById('startGameBtn').addEventListener('click', startGame);
+            document.getElementById('checkAnswerBtn').addEventListener('click', checkAnswer);
+            document.getElementById('resetGameBtn').addEventListener('click', resetGame);
+
+            // 기본 드래그 방지
+            document.addEventListener('dragover', (e) => e.preventDefault());
+            document.addEventListener('drop', (e) => e.preventDefault());
+        });
+    </script>
+</body>
+</html>
