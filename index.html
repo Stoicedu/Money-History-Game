@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html data-theme="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Currency History Timeline Game - Fixed Date Tags</title>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+    body {
+        font-family: 'Montserrat', sans-serif;
+    }
+    .card {
+        transition: all 0.3s ease;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+        min-height: 200px;
+        max-width: 280px;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+    .card:active {
+        cursor: grabbing;
+    }
+    .card-tag {
+        position: relative;
+        top: 0;
+        left: 0;
+        transform: none;
+        z-index: 10;
+        margin-bottom: 8px;
+        display: inline-block;
+    }
+    .card.dragging {
+        opacity: 0.6;
+        transform: scale(0.95);
+        z-index: 100;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+    }
+    .correct {
+        border: 3px solid #10B981 !important;
+        animation: correctPulse 0.6s ease-in-out;
+    }
+    .incorrect {
+        border: 3px solid #EF4444 !important;
+        animation: incorrectShake 0.6s ease-in-out;
+    }
+    @keyframes correctPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+    @keyframes incorrectShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    .drop-zone {
+        min-height: 220px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px dashed rgba(255, 255, 255, 0.3);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+    .drop-zone.highlight {
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 2px dashed rgba(59, 130, 246, 0.6);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+    .game-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+    .timeline-connector {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(to bottom, #3B82F6, #8B5CF6, #F59E0B);
+        transform: translateX(-50%);
+        z-index: 0;
+    }
+    .timeline-item {
+        position: relative;
+        z-index: 1;
+        margin-bottom: 2rem;
+    }
+    .timeline-date {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: #1e3a8a;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-weight: bold;
+        white-space: nowrap;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    .timeline-left .timeline-date {
+        right: calc(100% + 20px);
+    }
+    .timeline-right .timeline-date {
+        left: calc(100% + 20px);
+    }
+    .timeline-dot {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        top: 50%;
+        background-color: white;
+        border: 3px solid #1e3a8a;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+    .timeline-left .timeline-dot {
+        right: -30px;
+        transform: translateY(-50%);
+    }
+    .timeline-right .timeline-dot {
+        left: -30px;
+        transform: translateY(-50%);
+    }
+    .answer-section {
+        display: none;
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    .answer-section.show {
+        display: block;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .hidden {
+        display: none;
+    }
+    @media (max-width: 768px) {
+        .card {
+            min-height: 180px;
+            max-width: 240px;
+        }
+        .timeline-date {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+        }
+        .timeline-left .timeline-date {
+            right: calc(100% + 15px);
+        }
+        .timeline-right .timeline-date {
+            left: calc(100% + 15px);
+        }
+    }
+    .card-header {
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+</style>
+</head>
+<body class="bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 min-h-screen">
+
+<!-- Game Section -->
+<div id="gameSection" class="game-container">
+    <!-- Header -->
+    <div class="text-center mb-8 py-4">
+        <h1 class="text-3xl md:text-5xl font-bold text-yellow-300 mb-2" style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+            Currency History Timeline Game
+        </h1>
+        <p class="text-white text-lg md:text-xl">Drag and arrange the cards in chronological order from oldest to newest</p>
+    </div>
+
+    <!-- Game Status -->
+    <div class="text-center mb-6" id="gameStatus">
+        <div class="text-white text-xl" id="startScreen">
+            <p class="mb-2">Ready to test your knowledge of currency history?</p>
+            <p class="text-sm opacity-75">Arrange 8 historical money cards from ancient times to modern day</p>
+        </div>
+        <div class="hidden" id="gameResult">
+            <p class="text-2xl font-bold mb-2" id="resultMessage"></p>
+            <p class="text-xl mb-4" id="scoreDisplay"></p>
+        </div>
+    </div>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone hidden mb-8 flex flex-wrap gap-3 justify-center items-center" id="dropZone">
+        <div class="text-white text-center w-full mb-2">
+            <i class="fas fa-arrow-down text-2xl mb-2"></i>
+            <p>Drop cards here in chronological order (oldest to newest)</p>
+        </div>
+    </div>
+
+    <!-- Cards Container -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8 justify-items-center" id="cardsContainer">
+        
+        <!-- Card 1: Barter System -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="BC" data-name="Barter System" data-year="-9000" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-green-500 text-white text-xs px-3 py-1 rounded-full font-bold">9000-6000 BC</div>
+                </div>
+                <div class="h-20 bg-green-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-exchange-alt text-4xl text-green-300"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Barter System</h3>
+                <p class="text-white text-sm">Direct exchange of goods and services without using money</p>
+            </div>
+        </div>
+
+        <!-- Card 2: Cowrie Shells -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="BC" data-name="Cowrie Shells" data-year="-1200" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-pink-500 text-white text-xs px-3 py-1 rounded-full font-bold">1200 BC</div>
+                </div>
+                <div class="h-20 bg-pink-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-water text-4xl text-pink-200"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Cowrie Shells</h3>
+                <p class="text-white text-sm">First standardized currency using cowrie shells in China</p>
+            </div>
+        </div>
+
+        <!-- Card 3: Chinese Spade Coins -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="BC" data-name="Chinese Spade Coins" data-year="-640" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-indigo-500 text-white text-xs px-3 py-1 rounded-full font-bold">640 BC</div>
+                </div>
+                <div class="h-20 bg-indigo-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-gavel text-4xl text-indigo-300 transform rotate-45"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Chinese Spade Coins</h3>
+                <p class="text-white text-sm">First standardized metal coins shaped like tools</p>
+            </div>
+        </div>
+
+        <!-- Card 4: Lydian Coins -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="BC" data-name="Lydian Coins" data-year="-600" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-orange-500 text-white text-xs px-3 py-1 rounded-full font-bold">600 BC</div>
+                </div>
+                <div class="h-20 bg-orange-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-cookie text-4xl text-yellow-600"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Lydian Coins</h3>
+                <p class="text-white text-sm">First official currency using electrum (gold-silver alloy)</p>
+            </div>
+        </div>
+
+        <!-- Card 5: Paper Money -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="AD" data-name="Paper Money" data-year="960" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-bold">960-1020 AD</div>
+                </div>
+                <div class="h-20 bg-blue-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-scroll text-4xl text-blue-300"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Paper Money</h3>
+                <p class="text-white text-sm">First official paper currency (Jiaozi) during Song Dynasty</p>
+            </div>
+        </div>
+
+        <!-- Card 6: Gold Standard -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="AD" data-name="Gold Standard" data-year="1816" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-yellow-500 text-yellow-900 text-xs px-3 py-1 rounded-full font-bold">1816 AD</div>
+                </div>
+                <div class="h-20 bg-yellow-800 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-coins text-4xl text-yellow-400"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Gold Standard</h3>
+                <p class="text-white text-sm">England officially adopts the Gold Standard</p>
+            </div>
+        </div>
+
+        <!-- Card 7: End of Gold Standard -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="AD" data-name="End of Gold Standard" data-year="1930" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-red-500 text-white text-xs px-3 py-1 rounded-full font-bold">1930s</div>
+                </div>
+                <div class="h-20 bg-red-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fas fa-chart-line text-4xl text-red-300"></i>
+                    <i class="fas fa-ban text-4xl text-red-500 absolute opacity-70"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">End of Gold Standard</h3>
+                <p class="text-white text-sm">Great Depression leads to abandoning gold standard</p>
+            </div>
+        </div>
+
+        <!-- Card 8: Bitcoin -->
+        <div class="card bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden relative" data-era="AD" data-name="Bitcoin Emergence" data-year="2009" draggable="true">
+            <div class="p-4">
+                <div class="card-header">
+                    <div class="card-tag bg-purple-500 text-white text-xs px-3 py-1 rounded-full font-bold">2009 AD</div>
+                </div>
+                <div class="h-20 bg-purple-900 bg-opacity-30 rounded-lg flex items-center justify-center mb-3">
+                    <i class="fab fa-bitcoin text-4xl text-yellow-400"></i>
+                </div>
+                <h3 class="text-yellow-300 text-lg font-bold mb-2">Bitcoin Emergence</h3>
+                <p class="text-white text-sm">First decentralized digital cryptocurrency</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Game Controls -->
+    <div class="flex flex-wrap gap-4 justify-center mb-8">
+        <button class="bg-green-500 hover:bg-green-600 text-green-900 font-bold py-3 px-8 rounded-full flex items-center transition-all duration-300 transform hover:scale-105" id="startButton">
+            <i class="fas fa-play mr-2"></i>
+            <span>Start Game</span>
+        </button>
+        <button class="bg-yellow-500 hover:bg-yellow-600 text-yellow-900 font-bold py-3 px-8 rounded-full flex items-center hidden transition-all duration-300 transform hover:scale-105" id="checkButton">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span>Check Answer</span>
+        </button>
+        <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full flex items-center hidden transition-all duration-300 transform hover:scale-105" id="showAnswerButton">
+            <i class="fas fa-eye mr-2"></i>
+            <span>Show Correct Timeline</span>
+        </button>
+        <button class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-8 rounded-full flex items-center hidden transition-all duration-300 transform hover:scale-105" id="playAgainButton">
+            <i class="fas fa-redo mr-2"></i>
+            <span>Play Again</span>
+        </button>
+    </div>
+
+    <!-- Instructions -->
+    <div class="text-center text-white text-sm opacity-75">
+        <span id="gameInstruction">Click 'Start Game' to begin your journey through currency history</span>
+    </div>
+</div>
+
+<!-- Answer Section -->
+<div id="answerSection" class="answer-section game-container">
+    <div class="text-center mb-8 py-4">
+        <h1 class="text-3xl md:text-5xl font-bold text-yellow-300 mb-2" style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+            The Correct Timeline of Money Evolution
+        </h1>
+        <p class="text-white text-lg md:text-xl">From ancient bartering to digital currencies - 11,000 years of monetary history</p>
+    </div>
+
+    <div class="relative max-w-5xl mx-auto">
+        <!-- Timeline connector -->
+        <div class="timeline-connector"></div>
+        
+        <!-- Timeline items -->
+        <div class="space-y-8">
+            
+            <!-- Item 1: Barter System -->
+            <div class="timeline-item timeline-right flex w-full">
+                <div class="ml-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-green-300">9000-6000 BC</div>
+                    <div class="timeline-dot bg-green-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-green-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-exchange-alt text-2xl text-green-300"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">1. Barter System</h3>
+                            <p class="text-white text-sm leading-relaxed">The earliest form of exchange where goods and services were directly traded without using money. Communities exchanged surplus items for needed resources.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 2: Cowrie Shells -->
+            <div class="timeline-item timeline-left flex w-full">
+                <div class="mr-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-pink-300">1200 BC</div>
+                    <div class="timeline-dot bg-pink-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-pink-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-water text-2xl text-pink-300"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">2. Cowrie Shells</h3>
+                            <p class="text-white text-sm leading-relaxed">The first use of cowrie shells as standardized currency began in China. These small, durable shells were widely accepted across Asia and Africa for centuries.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 3: Chinese Spade Coins -->
+            <div class="timeline-item timeline-right flex w-full">
+                <div class="ml-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-indigo-300">640 BC</div>
+                    <div class="timeline-dot bg-indigo-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-indigo-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-gavel text-2xl text-indigo-300 transform rotate-45"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">3. Chinese Spade Coins</h3>
+                            <p class="text-white text-sm leading-relaxed">The world's oldest known coin minting site in China produced bronze spade coins. These tool-shaped coins were the first standardized metal currency.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 4: Lydian Coins -->
+            <div class="timeline-item timeline-left flex w-full">
+                <div class="mr-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-orange-300">600 BC</div>
+                    <div class="timeline-dot bg-orange-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-orange-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-cookie text-2xl text-yellow-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">4. Lydian Coins</h3>
+                            <p class="text-white text-sm leading-relaxed">King Alyattes of Lydia (now Turkey) minted what is considered the first official currency using electrum, a natural alloy of gold and silver.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 5: Paper Money -->
+            <div class="timeline-item timeline-right flex w-full">
+                <div class="ml-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-blue-300">960 AD</div>
+                    <div class="timeline-dot bg-blue-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-blue-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-scroll text-2xl text-blue-300"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">5. Paper Money</h3>
+                            <p class="text-white text-sm leading-relaxed">The first known paper banknotes appeared in China during the Song Dynasty. These "Jiaozi" notes replaced heavy strings of metal coins for large transactions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 6: Gold Standard -->
+            <div class="timeline-item timeline-left flex w-full">
+                <div class="mr-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-yellow-300">1816 AD</div>
+                    <div class="timeline-dot bg-yellow-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-yellow-800 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-coins text-2xl text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">6. Gold Standard</h3>
+                            <p class="text-white text-sm leading-relaxed">England officially made gold the standard of value, linking currency directly to gold. This created a fixed exchange rate system that spread worldwide.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 7: End of Gold Standard -->
+            <div class="timeline-item timeline-right flex w-full">
+                <div class="ml-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-red-300">1930s</div>
+                    <div class="timeline-dot bg-red-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-red-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-chart-line text-2xl text-red-300"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">7. End of Gold Standard</h3>
+                            <p class="text-white text-sm leading-relaxed">The Great Depression led countries to abandon the gold standard, starting a new era of fiat money where currency value was determined by governments rather than gold.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 8: Bitcoin -->
+            <div class="timeline-item timeline-left flex w-full">
+                <div class="mr-auto w-full md:w-5/12 bg-white bg-opacity-10 rounded-xl backdrop-filter backdrop-blur-sm border border-white border-opacity-20 overflow-hidden p-4">
+                    <div class="timeline-date text-purple-300">2009 AD</div>
+                    <div class="timeline-dot bg-purple-500"></div>
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 flex-shrink-0 bg-purple-900 bg-opacity-30 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fab fa-bitcoin text-2xl text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-yellow-300 font-bold text-xl mb-2">8. Bitcoin</h3>
+                            <p class="text-white text-sm leading-relaxed">The first decentralized digital cryptocurrency was introduced by Satoshi Nakamoto, marking the beginning of blockchain-based currencies not controlled by any central authority.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fun Fact -->
+    <div class="mt-12 text-center">
+        <div class="bg-gradient-to-r from-yellow-400 to-yellow-600 bg-opacity-20 border border-yellow-400 border-opacity-40 rounded-xl p-6 max-w-4xl mx-auto">
+            <p class="text-lg text-white leading-relaxed">
+                <i class="fas fa-lightbulb text-yellow-300 mr-2"></i>
+                <span class="text-yellow-300 font-semibold">Fun fact:</span> While monetary systems have evolved dramatically over 11,000 years, the basic concept remains the same: creating a trusted medium to facilitate trade and store value. From shells to digital wallets, humanity continues to innovate how we exchange value!
+            </p>
+        </div>
+    </div>
+
+    <!-- Back to Game Button -->
+    <div class="text-center mt-8">
+        <button class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-8 rounded-full flex items-center mx-auto transition-all duration-300 transform hover:scale-105" id="backToGameButton">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Back to Game</span>
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Game elements
+    const gameSection = document.getElementById('gameSection');
+    const answerSection = document.getElementById('answerSection');
+    const cardsContainer = document.getElementById('cardsContainer');
+    const dropZone = document.getElementById('dropZone');
+    const startButton = document.getElementById('startButton');
+    const checkButton = document.getElementById('checkButton');
+    const showAnswerButton = document.getElementById('showAnswerButton');
+    const playAgainButton = document.getElementById('playAgainButton');
+    const backToGameButton = document.getElementById('backToGameButton');
+    const gameStatus = document.getElementById('gameStatus');
+    const startScreen = document.getElementById('startScreen');
+    const gameResult = document.getElementById('gameResult');
+    const resultMessage = document.getElementById('resultMessage');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const gameInstruction = document.getElementById('gameInstruction');
+    
+    // All cards
+    const cards = Array.from(document.querySelectorAll('.card'));
+    
+    // Game state
+    let gameStarted = false;
+    let droppedCards = [];
+    
+    // Correct order by year (from oldest to newest)
+    const correctOrder = cards.slice().sort((a, b) => {
+        return parseInt(a.dataset.year) - parseInt(b.dataset.year);
+    });
+    
+    // Initialize game
+    function initGame() {
+        gameStarted = false;
+        droppedCards = [];
+        
+        // Show game section, hide answer section
+        gameSection.style.display = 'block';
+        answerSection.classList.remove('show');
+        
+        // Reset all cards to their original container
+        cards.forEach(card => {
+            cardsContainer.appendChild(card);
+            card.classList.remove('correct', 'incorrect');
+        });
+        
+        // Hide drop zone and results
+        dropZone.classList.add('hidden');
+        gameResult.classList.add('hidden');
+        startScreen.classList.remove('hidden');
+        
+        // Update button visibility
+        startButton.classList.remove('hidden');
+        checkButton.classList.add('hidden');
+        showAnswerButton.classList.add('hidden');
+        playAgainButton.classList.add('hidden');
+        
+        // Reset instructions
+        gameInstruction.textContent = "Click 'Start Game' to begin your journey through currency history";
+        
+        // Shuffle cards in container
+        shuffleCards();
+    }
+    
+    // Shuffle cards
+    function shuffleCards() {
+        const shuffled = cards.slice();
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        shuffled.forEach(card => cardsContainer.appendChild(card));
+    }
+    
+    // Start game
+    function startGame() {
+        gameStarted = true;
+        
+        // Shuffle cards again
+        shuffleCards();
+        
+        // Show drop zone
+        dropZone.classList.remove('hidden');
+        dropZone.innerHTML = `
+            <div class="text-white text-center w-full mb-2">
+                <i class="fas fa-arrow-down text-2xl mb-2"></i>
+                <p>Drop cards here in chronological order (oldest to newest)</p>
+            </div>
+        `;
+        droppedCards = [];
+        
+        // Update buttons and instructions
+        startButton.classList.add('hidden');
+        checkButton.classList.remove('hidden');
+        startScreen.classList.add('hidden');
+        gameInstruction.textContent = "Drag cards to the drop zone in chronological order - oldest to newest";
+    }
+    
+    // Check answer
+    function checkAnswer() {
+        if (droppedCards.length < 8) {
+            alert("Please place all 8 cards in the drop zone first!");
+            return;
+        }
+        
+        let correctCount = 0;
+        
+        // Compare user order with correct order
+        for (let i = 0; i < droppedCards.length; i++) {
+            if (droppedCards[i].dataset.name === correctOrder[i].dataset.name) {
+                droppedCards[i].classList.add('correct');
+                correctCount++;
+            } else {
+                droppedCards[i].classList.add('incorrect');
+            }
+        }
+        
+        // Calculate score
+        const score = Math.round((correctCount / 8) * 100);
+        
+        // Display results
+        resultMessage.textContent = getResultMessage(score);
+        resultMessage.className = score === 100 ? "text-2xl font-bold mb-2 text-green-300" : 
+                                  score >= 75 ? "text-2xl font-bold mb-2 text-yellow-300" :
+                                  "text-2xl font-bold mb-2 text-red-300";
+        scoreDisplay.textContent = `You got ${correctCount} out of 8 correct (${score}%)`;
+        gameResult.classList.remove('hidden');
+        
+        // Update buttons
+        checkButton.classList.add('hidden');
+        showAnswerButton.classList.remove('hidden');
+        playAgainButton.classList.remove('hidden');
+        
+        // Update instruction
+        gameInstruction.textContent = "Game completed! Check your results above";
+    }
+    
+    // Get message based on score
+    function getResultMessage(score) {
+        if (score === 100) return "🏆 Perfect! You're a currency history expert!";
+        if (score >= 87.5) return "🌟 Excellent! You know your monetary history!";
+        if (score >= 75) return "👍 Great job! You're learning well!";
+        if (score >= 50) return "📚 Good effort! Keep studying!";
+        return "💪 Keep learning! You'll get better!";
+    }
+    
+    // Show answer timeline
+    function showAnswerTimeline() {
+        gameSection.style.display = 'none';
+        answerSection.classList.add('show');
+    }
+    
+    // Back to game
+    function backToGame() {
+        answerSection.classList.remove('show');
+        gameSection.style.display = 'block';
+    }
+    
+    // Event listeners for buttons
+    startButton.addEventListener('click', startGame);
+    checkButton.addEventListener('click', checkAnswer);
+    showAnswerButton.addEventListener('click', showAnswerTimeline);
+    playAgainButton.addEventListener('click', initGame);
+    backToGameButton.addEventListener('click', backToGame);
+    
+    // Drag and drop functionality
+    cards.forEach(card => {
+        // Drag start
+        card.addEventListener('dragstart', function(e) {
+            if (!gameStarted) {
+                e.preventDefault();
+                return;
+            }
+            
+            this.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', this.dataset.name);
+        });
+        
+        // Drag end
+        card.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+        });
+        
+        // Touch support for mobile
+        let initialX, initialY, currentX, currentY;
+        let isDragging = false;
+        
+        card.addEventListener('touchstart', function(e) {
+            if (!gameStarted) return;
+            
+            initialX = e.touches[0].clientX;
+            initialY = e.touches[0].clientY;
+            isDragging = true;
+            this.classList.add('dragging');
+        });
+        
+        card.addEventListener('touchmove', function(e) {
+            if (!gameStarted || !isDragging) return;
+            e.preventDefault();
+            
+            currentX = e.touches[0].clientX - initialX;
+            currentY = e.touches[0].clientY - initialY;
+            
+            this.style.transform = `translate(${currentX}px, ${currentY}px)`;
+        });
+        
+        card.addEventListener('touchend', function(e) {
+            if (!gameStarted || !isDragging) return;
+            
+            isDragging = false;
+            this.classList.remove('dragging');
+            this.style.transform = '';
+            
+            const touch = e.changedTouches[0];
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            const cardsContainerRect = cardsContainer.getBoundingClientRect();
+            
+            if (
+                touch.clientX > dropZoneRect.left &&
+                touch.clientX < dropZoneRect.right &&
+                touch.clientY > dropZoneRect.top &&
+                touch.clientY < dropZoneRect.bottom
+            ) {
+                // Remove the instruction text if it exists
+                const instruction = dropZone.querySelector('div');
+                if (instruction && instruction.textContent.includes('Drop cards here')) {
+                    instruction.remove();
+                }
+                
+                dropZone.appendChild(this);
+                droppedCards = Array.from(dropZone.querySelectorAll('.card'));
+            } else if (
+                touch.clientX > cardsContainerRect.left &&
+                touch.clientX < cardsContainerRect.right &&
+                touch.clientY > cardsContainerRect.top &&
+                touch.clientY < cardsContainerRect.bottom
+            ) {
+                cardsContainer.appendChild(this);
+                droppedCards = Array.from(dropZone.querySelectorAll('.card'));
+                
+                // Re-add instruction if drop zone is empty
+                if (droppedCards.length === 0) {
+                    dropZone.innerHTML = `
+                        <div class="text-white text-center w-full mb-2">
+                            <i class="fas fa-arrow-down text-2xl mb-2"></i>
+                            <p>Drop cards here in chronological order (oldest to newest)</p>
+                        </div>
+                    `;
+                }
+            }
+        });
+    });
+    
+    // Drop zone event listeners
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('highlight');
+    });
+    
+    dropZone.addEventListener('dragleave', function() {
+        this.classList.remove('highlight');
+    });
+    
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('highlight');
+        
+        const cardName = e.dataTransfer.getData('text/plain');
+        const draggedCard = cards.find(card => card.dataset.name === cardName);
+        
+        if (draggedCard) {
+            // Remove the instruction text if it exists
+            const instruction = this.querySelector('div');
+            if (instruction && instruction.textContent.includes('Drop cards here')) {
+                instruction.remove();
+            }
+            
+            this.appendChild(draggedCard);
+            droppedCards = Array.from(this.querySelectorAll('.card'));
+        }
+    });
+    
+    // Cards container drop (for removing cards from drop zone)
+    cardsContainer.addEventListener('dragover', function(e) {
+        e.preventDefault();
+    });
+    
+    cardsContainer.addEventListener('drop', function(e) {
+        e.preventDefault();
+        
+        const cardName = e.dataTransfer.getData('text/plain');
+        const draggedCard = cards.find(card => card.dataset.name === cardName);
+        
+        if (draggedCard && draggedCard.parentElement === dropZone) {
+            this.appendChild(draggedCard);
+            droppedCards = Array.from(dropZone.querySelectorAll('.card'));
+            
+            // Re-add instruction if drop zone is empty
+            if (droppedCards.length === 0) {
+                dropZone.innerHTML = `
+                    <div class="text-white text-center w-full mb-2">
+                        <i class="fas fa-arrow-down text-2xl mb-2"></i>
+                        <p>Drop cards here in chronological order (oldest to newest)</p>
+                    </div>
+                `;
+            }
+        }
+    });
+    
+    // Initialize the game
+    initGame();
+});
+</script>
+
+</body>
+</html>
